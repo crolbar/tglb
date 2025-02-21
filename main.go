@@ -16,8 +16,7 @@ type model struct {
 	swStartTime time.Time
 	swStopTime  string
 
-	width  int
-	height int
+	fb lbfb.FrameBuffer
 }
 
 type TickMsg struct{}
@@ -62,6 +61,7 @@ func new_model() model {
 	return model{
 		swStartTime: time.Time{},
 		swStopTime:  "",
+		fb:          lbfb.NewFrameBuffer(0, 0),
 	}
 }
 
@@ -100,40 +100,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, Tick()
 		}
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.fb.Resize(msg.Width, msg.Height)
 	}
 
 	return m, cmd
 }
 
 func (m model) View() string {
-	if m.width == 0 {
-		return ""
-	}
-
 	var (
-		fb = lbfb.NewFrameBuffer(uint16(m.width), uint16(m.height))
-
 		vsplit = l.Vercital().
 			Constrains(
 				lbl.NewConstrain(lbl.Percent, 25),
 				lbl.NewConstrain(lbl.Percent, 50),
 				lbl.NewConstrain(lbl.Percent, 25),
-			).Split(fb.Size())
+			).Split(m.fb.Size())
 
 		timeRect = vsplit[1]
 
-		time = lb.MarginLeft(max(0, (int(timeRect.Width)/2)-(7*4)/2),
-			lb.ExpandVertical(int(timeRect.Height), lb.Center,
-				m.stopwatchGetElapsed(),
-			),
-		)
+		time = m.stopwatchGetElapsed()
 	)
 
-	fb.RenderString(time, timeRect)
+	m.fb.Clear()
 
-	return fb.View()
+	m.fb.RenderString(time, timeRect, lb.Center, lb.Center)
+
+	return m.fb.View()
 }
 
 func (m model) Init() tea.Cmd {
